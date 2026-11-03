@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Form RPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-image: url('rpg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            image-rendering: pixelated;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Modern Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.78);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+            border-radius: 1.5rem;
+        }
+
+        .glass-input {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            transition: all 0.2s ease;
+            border-radius: 0.75rem;
+        }
+        .glass-input:focus {
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3);
+            outline: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+
+        .toast-enter { animation: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-leave { animation: fade-out-down 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes fade-in-up {
+            0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fade-out-down {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(20px) scale(0.95); }
+        }
+        @keyframes attack-shake {
+            0% { transform: translateX(0) scale(1); }
+            25% { transform: translateX(-8px) scale(1.05); }
+            50% { transform: translateX(8px) scale(0.95); }
+            75% { transform: translateX(-8px) scale(1.02); }
+            100% { transform: translateX(0) scale(1); }
+        }
+        .animate-attack { animation: attack-shake 0.25s ease-in-out; }
+
+        @keyframes monster-dash {
+            0% { transform: translateY(0) scale(1); }
+            40% { transform: translateY(28px) scale(1.15); }
+            70% { transform: translateY(28px) scale(1.15); }
+            100% { transform: translateY(0) scale(1); }
+        }
+        .animate-dash { animation: monster-dash 0.4s ease-in-out; }
+
+        @keyframes slash-undertale {
+            0% { opacity: 0; transform: translate(-50%, -50%) translateY(-30px) scaleY(0.2) scaleX(2.0) rotate(-25deg); }
+            25% { opacity: 1; transform: translate(-50%, -50%) translateY(0px) scaleY(2.5) scaleX(0.4) rotate(-15deg); }
+            60% { opacity: 1; transform: translate(-50%, -50%) translateY(10px) scaleY(1.0) scaleX(0.25) rotate(0deg); }
+            100% { opacity: 0; transform: translate(-50%, -50%) translateY(20px) scaleY(0.5) scaleX(0.1) rotate(10deg); }
+        }
+        .animate-slash {
+            animation: slash-undertale 0.35s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+        }
+
+        @keyframes screen-shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-8px, 6px); }
+            40% { transform: translate(8px, -6px); }
+            60% { transform: translate(-6px, -4px); }
+            80% { transform: translate(6px, 4px); }
+        }
+        .animate-screen-shake { animation: screen-shake 0.3s ease-in-out; }
+
+        @keyframes float-up {
+            0% { opacity: 1; transform: translateY(0) scale(0.8); }
+            50% { opacity: 1; transform: translateY(-25px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1); }
+        }
+        .damage-popup {
+            position: absolute;
+            font-weight: 800;
+            font-size: 1.25rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            animation: float-up 0.8s ease-out forwards;
+            z-index: 40;
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 relative">
+
+    <!-- Screen Damage Overlay -->
+    <div id="damage-flash-overlay" class="fixed inset-0 pointer-events-none transition-opacity duration-300 z-30 opacity-0 bg-rose-600/40"></div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center p-4">
+        <div class="glass-panel p-6 w-full max-w-lg relative">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-amber-400">🛒 방랑 상점</h3>
+                    <p class="text-xs text-slate-400">아이템을 구매하거나 불필요한 장비를 판매하세요!</p>
+                </div>
+                <button id="btn-close-shop" class="text-slate-400 hover:text-white text-xl font-bold px-2 py-1">&times;</button>
+            </div>
+            <div class="flex justify-between items-center mb-3 bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/40">
+                <span class="text-xs text-slate-300">보유 골드</span>
+                <span id="shop-gold" class="text-amber-400 font-bold text-sm">0 G</span>
+            </div>
+
+            <!-- Shop Tabs -->
+            <div class="flex border-b border-slate-700/60 mb-3">
+                <button id="shop-tab-buy" class="flex-1 pb-2 text-xs font-bold text-amber-400 border-b-2 border-amber-400 transition-all">아이템 구매</button>
+                <button id="shop-tab-sell" class="flex-1 pb-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all">장비 및 아이템 판매</button>
+            </div>
+
+            <div id="shop-buy-container">
+                <div id="shop-items-list" class="space-y-2 max-h-52 overflow-y-auto pr-1 mb-4"></div>
+            </div>
+
+            <div id="shop-sell-container" class="hidden">
+                <div id="shop-sell-list" class="space-y-2 max-h-52 overflow-y-auto pr-1 mb-4"></div>
+            </div>
+
+            <button id="btn-close-shop-footer" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl text-xs font-semibold transition-all">상점 닫기</button>
+        </div>
+    </div>
+
+    <!-- Blacksmith Modal -->
+    <div id="blacksmith-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center p-4">
+        <div class="glass-panel p-6 w-full max-w-lg relative">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-purple-400">⚒️ 대장간</h3>
+                    <p class="text-xs text-slate-400">몬스터 재료와 골드로 무기 및 갑옷을 강화하거나 진화시킵니다.</p>
+                </div>
+                <button id="btn-close-blacksmith" class="text-slate-400 hover:text-white text-xl font-bold px-2 py-1">&times;</button>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2 mb-3 bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/40">
+                <div class="text-xs text-slate-300">보유 골드: <span id="bs-gold" class="text-amber-400 font-bold">0 G</span></div>
+                <div class="text-xs text-slate-300 text-right">몬스터 킬수: <span id="bs-kills" class="text-sky-400 font-bold">0킬</span></div>
+            </div>
+
+            <div class="mb-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                <span class="block text-xs font-bold text-slate-300 mb-2">🧪 보유 강화 재료</span>
+                <div id="bs-materials-list" class="flex flex-wrap gap-2 text-xs">
+                    <!-- Materials injected here -->
+                </div>
+            </div>
+
+            <div class="space-y-2 max-h-48 overflow-y-auto pr-1 mb-4" id="bs-equipment-list">
+                <!-- Upgradeable equipment list -->
+            </div>
+
+            <button id="btn-close-bs-footer" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl text-xs font-semibold transition-all">대장간 나가기</button>
+        </div>
+    </div>
+
+    <!-- 1. Login Screen -->
+    <div id="login-screen" class="glass-panel p-8 w-full max-w-md">
+        <div class="text-center mb-8">
+            <span class="inline-block px-3 py-1 bg-sky-500/20 text-sky-400 text-xs font-semibold rounded-full mb-3 border border-sky-500/30">CLOUD RPG SYSTEM</span>
+            <h1 class="text-3xl font-bold tracking-tight text-white mb-2">Google Drive RPG</h1>
+            <p class="text-slate-400 text-sm">계정을 입력하고 모험의 무기를 선택하세요.</p>
+        </div>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">아이디 (ID)</label>
+                <input type="text" id="login-id" class="glass-input w-full px-4 py-2.5 text-sm placeholder-slate-500" placeholder="아이디를 입력하세요">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">비밀번호 (PASSWORD)</label>
+                <input type="password" id="login-pw" class="glass-input w-full px-4 py-2.5 text-sm placeholder-slate-500" placeholder="비밀번호를 입력하세요">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">닉네임 (NICKNAME)</label>
+                <input type="text" id="login-nickname" class="glass-input w-full px-4 py-2.5 text-sm placeholder-slate-500" placeholder="캐릭터 닉네임을 입력하세요">
+            </div>
+            
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">초기 무기 선택</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-sky-500 transition-all">
+                        <input type="radio" name="init-weapon" value="단검" checked class="text-sky-500">
+                        <span class="text-xs font-semibold">🗡️ 단검 (치명타)</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-sky-500 transition-all">
+                        <input type="radio" name="init-weapon" value="대검" class="text-sky-500">
+                        <span class="text-xs font-semibold">⚔️ 대검 (고공격)</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-sky-500 transition-all">
+                        <input type="radio" name="init-weapon" value="지팡이" class="text-sky-500">
+                        <span class="text-xs font-semibold">🪄 지팡이 (마법)</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-sky-500 transition-all">
+                        <input type="radio" name="init-weapon" value="장검" class="text-sky-500">
+                        <span class="text-xs font-semibold">🤺 장검 (밸런스)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button id="btn-login" class="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-sky-500/20 transition-all duration-200 active:scale-95 flex justify-center items-center text-sm">
+                    <span id="login-text">로그인</span>
+                    <svg id="login-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+                <button id="btn-create" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl shadow-lg transition-all duration-200 active:scale-95 flex justify-center items-center text-sm border border-slate-600">
+                    <span id="create-text">계정 생성</span>
+                    <svg id="create-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Game Screen -->
+    <div id="game-screen" class="hidden glass-panel w-full max-w-4xl flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Left Panel: Stats & Inventory -->
+        <div class="w-full md:w-1/3 bg-slate-900/40 p-6 border-b md:border-b-0 md:border-r border-slate-700/50 flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 id="stat-nickname" class="text-sm font-bold tracking-wider text-sky-400">모험가</h2>
+                        <span id="stat-class" class="text-[10px] text-amber-300 font-medium">초보자 (수련 중)</span>
+                    </div>
+                    <span id="stat-level" class="px-2.5 py-1 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full border border-amber-500/30">Lv. 1</span>
+                </div>
+                
+                <div class="space-y-3 mb-4">
+                    <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/40 flex justify-between items-center">
+                        <span class="text-xs text-slate-400 font-medium">아이디 / 킬수</span>
+                        <span id="stat-id-kills" class="font-bold text-white text-xs">Player (0킬)</span>
+                    </div>
+
+                    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/40 space-y-1.5">
+                        <div class="flex justify-between text-xs font-medium">
+                            <span class="text-rose-400 font-semibold">HP (체력)</span>
+                            <span id="stat-hp-text" class="text-slate-200 text-xs">100 / 100</span>
+                        </div>
+                        <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+                            <div id="stat-hp-bar" class="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-full transition-all duration-300" style="width: 100%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/40 space-y-1.5">
+                        <div class="flex justify-between text-xs font-medium">
+                            <span class="text-emerald-400 font-semibold">EXP (경험치)</span>
+                            <span id="stat-exp-text" class="text-slate-200 text-xs">0 / 20</span>
+                        </div>
+                        <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+                            <div id="stat-exp-bar" class="bg-gradient-to-r from-emerald-500 to-green-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Stat Points Distribution Panel -->
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-amber-300">✨ 스탯 포인트 (SP)</span>
+                            <span id="stat-sp-count" class="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-bold">0 SP</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5 text-center">
+                            <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 flex flex-col justify-between">
+                                <span class="text-[10px] text-slate-400">공격력 (+2)</span>
+                                <span id="stat-bonus-atk" class="text-xs font-bold text-white my-1">+0</span>
+                                <button onclick="allocateStat('atk')" class="bg-sky-600 hover:bg-sky-500 text-white py-1 rounded text-[10px] font-bold transition-all">+</button>
+                            </div>
+                            <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 flex flex-col justify-between">
+                                <span class="text-[10px] text-slate-400">크리티컬 (+2%)</span>
+                                <span id="stat-bonus-crit" class="text-xs font-bold text-amber-400 my-1">0%</span>
+                                <button onclick="allocateStat('crit')" class="bg-sky-600 hover:bg-sky-500 text-white py-1 rounded text-[10px] font-bold transition-all">+</button>
+                            </div>
+                            <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 flex flex-col justify-between">
+                                <span class="text-[10px] text-slate-400">최대체력 (+20)</span>
+                                <span id="stat-bonus-hp" class="text-xs font-bold text-rose-400 my-1">+0</span>
+                                <button onclick="allocateStat('hp')" class="bg-sky-600 hover:bg-sky-500 text-white py-1 rounded text-[10px] font-bold transition-all">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="bg-slate-800/60 p-2 rounded-xl border border-slate-700/40 text-center">
+                            <span class="block text-[9px] uppercase text-slate-400">Gold</span>
+                            <span id="stat-gold" class="font-bold text-amber-400 text-xs">0 G</span>
+                        </div>
+                        <div class="bg-slate-800/60 p-2 rounded-xl border border-slate-700/40 text-center">
+                            <span class="block text-[9px] uppercase text-slate-400">ATK</span>
+                            <span id="stat-atk" class="font-bold text-white text-xs">12</span>
+                        </div>
+                        <div class="bg-slate-800/60 p-2 rounded-xl border border-slate-700/40 text-center">
+                            <span class="block text-[9px] uppercase text-slate-400">DEF</span>
+                            <span id="stat-def" class="font-bold text-sky-400 text-xs">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Panel -->
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 mb-4">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2 flex items-center justify-between">
+                        <span>📦 인벤토리 / 장비</span>
+                        <div class="flex gap-1">
+                            <span id="weapon-badge" class="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">단검</span>
+                            <span id="armor-badge" class="text-[10px] px-2 py-0.5 bg-sky-500/20 text-sky-300 rounded border border-sky-500/30">천옷</span>
+                        </div>
+                    </h3>
+                    <div id="inventory-list" class="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                        <div class="text-[11px] text-slate-500 text-center py-2">인벤토리가 비어 있습니다.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-open-shop" class="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-semibold py-2.5 px-2 rounded-xl shadow-lg transition-all active:scale-95 text-[11px] flex flex-col items-center justify-center">
+                        <span>🛒 방랑 상점</span>
+                        <span id="shop-unlock-badge" class="text-[9px] text-amber-200 font-mono">(5킬 해금)</span>
+                    </button>
+                    <button id="btn-open-blacksmith" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2.5 px-2 rounded-xl shadow-lg transition-all active:scale-95 text-[11px] flex flex-col items-center justify-center">
+                        <span>⚒️ 대장간</span>
+                        <span id="bs-unlock-badge" class="text-[9px] text-purple-200 font-mono">(3킬 해금)</span>
+                    </button>
+                </div>
+                <button id="btn-save" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transition-all duration-200 active:scale-95 flex justify-center items-center gap-2 text-xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    <span id="save-text">클라우드 저장하기</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Actions & Log -->
+        <div class="w-full md:w-2/3 p-6 flex flex-col justify-between">
+            
+            <!-- Monster Display -->
+            <div id="monster-area" class="bg-slate-900/60 rounded-2xl p-5 mb-5 flex flex-col items-center justify-center border border-slate-700/50 shadow-inner relative overflow-hidden">
+                <div class="absolute top-3 left-4 text-[10px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <span>Encounter</span>
+                    <span id="turn-indicator" class="px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded-full border border-sky-500/30">내 턴</span>
+                </div>
+                <h3 id="monster-name" class="text-lg font-bold text-rose-400 mb-3 mt-2">슬라임</h3>
+                <div class="w-3/4 max-w-[200px] bg-slate-950 rounded-full h-2 mb-2 overflow-hidden border border-slate-800">
+                    <div id="monster-hp-bar" class="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-full transition-all duration-150" style="width: 100%"></div>
+                </div>
+                <span id="monster-hp-text" class="text-xs text-slate-400 mb-4 font-medium">HP: 20 / 20</span>
+                <div id="monster-img-container" class="py-1 transition-transform flex items-center justify-center relative">
+                    <img id="monster-img" src="Slime.jpg" alt="슬라임" class="w-24 h-24 object-contain filter drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)]" onerror="this.onerror=null; this.parentNode.innerHTML='<span class=\'text-5xl filter drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)]\'>👾</span>';">
+                    <!-- Undertale Slash Effect Element -->
+                    <div id="slash-effect-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 z-30 overflow-visible">
+                        <img src="SLASH EFFECT.jpg" alt="Slash" class="w-36 h-36 object-contain filter drop-shadow-[0_0_12px_rgba(239,68,68,0.9)] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" onerror="this.onerror=null; this.innerHTML='<span class=\'text-red-500 text-6xl font-extrabold\'>⚡</span>';">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-3 gap-3 mb-5">
+                <button id="btn-attack" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold py-3.5 px-3 rounded-xl shadow-lg shadow-rose-600/20 transition-all duration-200 active:scale-95 text-xs sm:text-sm flex flex-col items-center justify-center gap-1">
+                    <span class="text-base">⚔️</span> 기본 공격
+                </button>
+                <button id="btn-skill" disabled class="bg-gradient-to-r from-amber-600/40 to-orange-600/40 text-slate-400 font-bold py-3.5 px-3 rounded-xl shadow-lg transition-all duration-200 text-xs sm:text-sm flex flex-col items-center justify-center gap-1 cursor-not-allowed border border-amber-500/20 relative">
+                    <span class="text-base">🔥</span> 강타 스킬
+                    <span id="skill-charge-badge" class="absolute -top-2 -right-2 bg-amber-500 text-slate-950 font-bold text-[10px] px-1.5 py-0.5 rounded-full shadow">0/5</span>
+                </button>
+                <button id="btn-heal" class="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold py-3.5 px-3 rounded-xl shadow-lg shadow-emerald-600/20 transition-all duration-200 active:scale-95 text-xs sm:text-sm flex flex-col items-center justify-center gap-1">
+                    <span class="text-base">🧪</span> 물약 회복
+                </button>
+            </div>
+
+            <!-- Game Log -->
+            <div class="bg-slate-950/80 rounded-xl p-4 font-mono text-xs overflow-y-auto border border-slate-800/80 h-36 flex flex-col space-y-1" id="log-container">
+                <div class="text-slate-500">[시스템] 모험이 시작되었습니다...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // [설정 영역]
+        // ==========================================
+        const WEB_APP_URL = "여기에_앱스_스크립트_URL을_넣으세요"; 
+        const FORM_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLScSwZ4uA1MiKtSkaHWLlseW40xUKcndC77pHd8T5LP3JllmKA/formResponse";
+        
+        const ENTRY_ID = "entry.111111111";       // 아이디
+        const ENTRY_PW = "entry.222222222";       // 비밀번호
+        const ENTRY_NICKNAME = "entry.444444444"; // 닉네임
+        const ENTRY_DATA = "entry.333333333";     // 세이브데이터
+        // ==========================================
+
+        const screens = {
+            login: document.getElementById('login-screen'),
+            game: document.getElementById('game-screen')
+        };
+        const logs = document.getElementById('log-container');
+        
+        let player = {
+            id: '',
+            pw: '',
+            nickname: '모험가',
+            weapon: '단검',
+            weaponTier: '일반',
+            weaponEnhance: 0,
+            armor: '천옷',
+            armorTier: '일반',
+            armorDef: 0,
+            armorEnhance: 0,
+            classTitle: '초보자',
+            weaponKills: { '단검': 0, '대검': 0, '지팡이': 0, '장검': 0 },
+            totalKills: 0,
+            level: 1,
+            hp: 100,
+            maxHp: 100,
+            exp: 0,
+            maxExp: 20,
+            gold: 50,
+            atk: 12,
+            def: 0,
+            statPoints: 0,
+            bonusAtk: 0,
+            bonusCrit: 0, // 기본 20% 크리 확률에 더해짐
+            bonusHp: 0,
+            inventory: [],
+            materials: {
+                '슬라임 젤리': 0,
+                '고블린 투구조각': 0,
+                '오크 어깨패드': 0,
+                '드래곤 비늘': 0
+            }
+        };
+
+        let currentMonster = null;
+        let isPlayerTurn = true;
+        let skillChargeCount = 0;
+        let isProcessing = false; // 버그 방지용 상태 잠금 플래그
+        let shopResetKillCounter = 0; // 상점 리셋을 위한 킬 카운터
+
+        const monsters = [
+            { name: '슬라임', hp: 20, atk: 2, exp: 5, gold: 15, dropMaterial: '슬라임 젤리', imgPath: 'Slime.jpg' },
+            { name: '고블린', hp: 50, atk: 5, exp: 12, gold: 35, dropMaterial: '고블린 투구조각', imgPath: 'gb.jpg' },
+            { name: '오크', hp: 120, atk: 12, exp: 30, gold: 70, dropMaterial: '오크 어깨패드', emoji: '👹' },
+            { name: '드래곤', hp: 500, atk: 35, exp: 100, gold: 350, dropMaterial: '드래곤 비늘', emoji: '🐉' }
+        ];
+
+        const tierColors = {
+            '일반': 'text-slate-300 border-slate-700 bg-slate-900/40',
+            '희귀': 'text-sky-400 border-sky-500/40 bg-sky-950/40',
+            '에픽': 'text-purple-400 border-purple-500/40 bg-purple-950/40',
+            '전설': 'text-amber-400 border-amber-500/40 bg-amber-950/40',
+            '신화': 'text-rose-400 border-rose-500/50 bg-rose-950/50 font-bold'
+        };
+
+        const shopInventory = [
+            { name: '회복 포션', type: 'potion', effect: 40, price: 30, sellPrice: 15, icon: '🧪', desc: 'HP 40 회복', tier: '일반' },
+            { name: '고급 회복 포션', type: 'potion', effect: 100, price: 70, sellPrice: 35, icon: '🍷', desc: 'HP 100 회복', tier: '희귀' },
+            { name: '가죽 갑옷', type: 'armor', defBonus: 3, hpBonus: 25, price: 100, sellPrice: 50, icon: '🧥', desc: '피해감소 3, 최대체력 +25', tier: '일반' },
+            { name: '철갑옷', type: 'armor', defBonus: 6, hpBonus: 60, price: 220, sellPrice: 110, icon: '🛡️', desc: '피해감소 6, 최대체력 +60', tier: '희귀' },
+            { name: '정밀한 단검', type: 'weapon', weaponType: '단검', atkBonus: 6, price: 110, sellPrice: 55, icon: '🗡️', desc: '공격력 +6 (단검)', tier: '희귀' },
+            { name: '파괴의 대검', type: 'weapon', weaponType: '대검', atkBonus: 12, price: 200, sellPrice: 100, icon: '⚔️', desc: '공격력 +12 (대검)', tier: '에픽' },
+            { name: '마력의 지팡이', type: 'weapon', weaponType: '지팡이', atkBonus: 10, price: 170, sellPrice: 85, icon: '🪄', desc: '공격력 +10 (지팡이)', tier: '희귀' },
+            { name: '기사의 장검', type: 'weapon', weaponType: '장검', atkBonus: 14, price: 240, sellPrice: 120, icon: '🤺', desc: '공격력 +14 (장검)', tier: '에픽' }
+        ];
+
+        const dropItemPool = [
+            { name: '녹슨 단검', type: 'weapon', weaponType: '단검', atkBonus: 4, sellPrice: 20, icon: '🗡️', desc: '공격력 +4 단검', tier: '일반' },
+            { name: '낡은 장검', type: 'weapon', weaponType: '장검', atkBonus: 5, sellPrice: 25, icon: '🤺', desc: '공격력 +5 장검', tier: '일반' },
+            { name: '가죽 누더기', type: 'armor', defBonus: 2, hpBonus: 15, sellPrice: 30, icon: '🧥', desc: '피해감소 2, 최대체력 +15', tier: '일반' },
+            { name: '회복 포션', type: 'potion', effect: 30, sellPrice: 15, icon: '🧪', desc: 'HP 30 회복', tier: '일반' },
+            
+            { name: '정밀 단검', type: 'weapon', weaponType: '단검', atkBonus: 9, sellPrice: 70, icon: '🗡️✨', desc: '공격력 +9 단검', tier: '희귀' },
+            { name: '강철 장검', type: 'weapon', weaponType: '장검', atkBonus: 11, sellPrice: 90, icon: '🤺✨', desc: '공격력 +11 장검', tier: '희귀' },
+            { name: '철갑옷', type: 'armor', defBonus: 5, hpBonus: 50, sellPrice: 85, icon: '🛡️', desc: '피해감소 5, 최대체력 +50', tier: '희귀' },
+            
+            { name: '암살자의 비수', type: 'weapon', weaponType: '단검', atkBonus: 16, sellPrice: 180, icon: '🗡️🔥', desc: '공격력 +16 단검', tier: '에픽' },
+            { name: '대지의 대검', type: 'weapon', weaponType: '대검', atkBonus: 22, sellPrice: 240, icon: '⚔️🔥', desc: '공격력 +22 대검', tier: '에픽' },
+            { name: '판금 갑주', type: 'armor', defBonus: 10, hpBonus: 110, sellPrice: 210, icon: '🛡️🔥', desc: '피해감소 10, 최대체력 +110', tier: '에픽' },
+
+            { name: '영웅의 칼날', type: 'weapon', weaponType: '장검', atkBonus: 32, sellPrice: 480, icon: '🤺💫', desc: '공격력 +32 장검', tier: '전설' },
+            { name: '불멸의 수호갑옷', type: 'armor', defBonus: 16, hpBonus: 180, sellPrice: 520, icon: '🛡️💫', desc: '피해감소 16, 최대체력 +180', tier: '전설' },
+
+            { name: '세계수의 지팡이', type: 'weapon', weaponType: '지팡이', atkBonus: 48, sellPrice: 1100, icon: '🪄🌟', desc: '공격력 +48 지팡이', tier: '신화' }
+        ];
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast-enter px-4 py-3 rounded-xl shadow-xl text-xs font-semibold text-white flex items-center gap-2 border ${
+                type === 'success' ? 'bg-emerald-600/90 border-emerald-500' :
+                type === 'warning' ? 'bg-amber-600/90 border-amber-500' :
+                type === 'error' ? 'bg-rose-600/90 border-rose-500' : 'bg-slate-800/90 border-slate-700'
+            }`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-leave');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        function addLog(text, className = 'text-slate-300') {
+            const div = document.createElement('div');
+            div.className = className;
+            div.innerHTML = text;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // 스탯 및 클래스 계산 재적용
+        function recalculatePlayerStats() {
+            // 기본 공격력: 레벨당 +3 + 무기 기본 + 보너스 스탯
+            let baseAtk = 10 + (player.level - 1) * 3 + (player.bonusAtk || 0);
+            if (player.weapon === '단검') baseAtk += 4 + (player.weaponEnhance * 2);
+            else if (player.weapon === '대검') baseAtk += 8 + (player.weaponEnhance * 3);
+            else if (player.weapon === '지팡이') baseAtk += 6 + (player.weaponEnhance * 2);
+            else if (player.weapon === '장검') baseAtk += 7 + (player.weaponEnhance * 2.5);
+
+            player.atk = Math.floor(baseAtk);
+            player.def = player.armorDef + (player.armorEnhance * 2);
+
+            // 직업 판정
+            let maxKills = 0;
+            let dominantWeapon = '단검';
+            for (let w in player.weaponKills) {
+                if (player.weaponKills[w] > maxKills) {
+                    maxKills = player.weaponKills[w];
+                    dominantWeapon = w;
+                }
+            }
+
+            if (maxKills >= 5) {
+                if (dominantWeapon === '단검') { player.classTitle = '암살자'; }
+                else if (dominantWeapon === '대검') { player.classTitle = '광전사'; }
+                else if (dominantWeapon === '지팡이') { player.classTitle = '대마법사'; }
+                else if (dominantWeapon === '장검') { player.classTitle = '소드마스터'; }
+            } else {
+                player.classTitle = '초보 모험가';
+            }
+
+            document.getElementById('stat-nickname').innerText = player.nickname;
+            document.getElementById('stat-class').innerText = player.classTitle;
+            document.getElementById('stat-level').innerText = `Lv. ${player.level}`;
+            document.getElementById('stat-id-kills').innerText = `${player.id} (${player.totalKills}킬)`;
+            document.getElementById('stat-hp-text').innerText = `${player.hp} / ${player.maxHp}`;
+            document.getElementById('stat-hp-bar').style.width = `${Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100))}%`;
+            document.getElementById('stat-exp-text').innerText = `${player.exp} / ${player.maxExp}`;
+            document.getElementById('stat-exp-bar').style.width = `${Math.min(100, (player.exp / player.maxExp) * 100)}%`;
+            document.getElementById('stat-gold').innerText = `${player.gold} G`;
+            document.getElementById('stat-atk').innerText = player.atk;
+            document.getElementById('stat-def').innerText = player.def;
+
+            document.getElementById('stat-sp-count').innerText = `${player.statPoints || 0} SP`;
+            document.getElementById('stat-bonus-atk').innerText = `+${player.bonusAtk || 0}`;
+            document.getElementById('stat-bonus-crit').innerText = `${player.bonusCrit || 0}%`;
+            document.getElementById('stat-bonus-hp').innerText = `+${player.bonusHp || 0}`;
+
+            document.getElementById('weapon-badge').innerText = `${player.weapon} (+${player.weaponEnhance})`;
+            document.getElementById('armor-badge').innerText = `${player.armor} (+${player.armorEnhance})`;
+
+            const hpRatio = player.hp / player.maxHp;
+            const flashOverlay = document.getElementById('damage-flash-overlay');
+            if (hpRatio <= 0.3) {
+                flashOverlay.style.opacity = `${(0.3 - hpRatio) * 2.2}`;
+            } else {
+                flashOverlay.style.opacity = '0';
+            }
+        }
+
+        window.allocateStat = function(type) {
+            if (!player.statPoints || player.statPoints <= 0) {
+                showToast('사용할 수 있는 스탯 포인트(SP)가 부족합니다!', 'warning');
+                return;
+            }
+            player.statPoints -= 1;
+            if (type === 'atk') {
+                player.bonusAtk = (player.bonusAtk || 0) + 2;
+                showToast('공격력이 증가했습니다!', 'success');
+            } else if (type === 'crit') {
+                player.bonusCrit = (player.bonusCrit || 0) + 2;
+                showToast('크리티컬 확률이 증가했습니다!', 'success');
+            } else if (type === 'hp') {
+                player.bonusHp = (player.bonusHp || 0) + 20;
+                player.maxHp += 20;
+                player.hp += 20;
+                showToast('최대 체력이 증가했습니다!', 'success');
+            }
+            recalculatePlayerStats();
+        };
+
+        function updateInventoryUI() {
+            const invContainer = document.getElementById('inventory-list');
+            if (!player.inventory || player.inventory.length === 0) {
+                invContainer.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-2">인벤토리가 비어 있습니다.</div>`;
+                return;
+            }
+
+            invContainer.innerHTML = '';
+            player.inventory.forEach((item, index) => {
+                const tierName = item.tier || '일반';
+                const badgeStyle = tierColors[tierName] || tierColors['일반'];
+
+                const itemEl = document.createElement('div');
+                itemEl.className = `p-2 rounded-lg border flex items-center justify-between text-xs ${badgeStyle}`;
+                itemEl.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span>${item.icon}</span>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold">${item.name}</span>
+                                <span class="text-[9px] px-1 rounded border border-current opacity-80">${tierName}</span>
+                            </div>
+                            <span class="block text-[9px] text-slate-400">${item.desc}</span>
+                        </div>
+                    </div>
+                    <button class="bg-sky-600 hover:bg-sky-500 text-white px-2 py-1 rounded text-[10px] transition-colors" onclick="useInventoryItem(${index})">장착/사용</button>
+                `;
+                invContainer.appendChild(itemEl);
+            });
+        }
+
+        window.useInventoryItem = function(index) {
+            const item = player.inventory[index];
+            if (item.type === 'potion') {
+                player.hp = Math.min(player.maxHp, player.hp + item.effect);
+                showToast(`포션을 사용하여 HP가 ${item.effect} 회복되었습니다!`, 'success');
+                addLog(`🧪 [아이템] 회복 포션을 사용해 HP가 ${item.effect} 회복되었습니다.`, 'text-emerald-400');
+                player.inventory.splice(index, 1);
+            } else if (item.type === 'weapon') {
+                player.inventory.splice(index, 1);
+                // 기존 무기를 인벤토리로 되돌리기
+                player.inventory.push({
+                    name: `${player.weapon} (${player.weaponTier})`,
+                    type: 'weapon',
+                    weaponType: player.weapon,
+                    atkBonus: player.atk - (10 + (player.level - 1) * 3),
+                    sellPrice: 30,
+                    icon: '🗡️',
+                    desc: '이전 장착 무기',
+                    tier: player.weaponTier
+                });
+                player.weapon = item.weaponType || item.name;
+                player.weaponTier = item.tier || '일반';
+                showToast(`${player.weapon} (${player.weaponTier}) 장착 완료!`, 'success');
+                addLog(`⚔️ [장비] 새로운 무기 '${player.weapon}'을(를) 장착했습니다.`, 'text-amber-400');
+            } else if (item.type === 'armor') {
+                player.inventory.splice(index, 1);
+                player.armor = item.name;
+                player.armorTier = item.tier || '일반';
+                player.armorDef = item.defBonus || 3;
+                player.maxHp += (item.hpBonus || 30);
+                player.hp = Math.min(player.maxHp, player.hp + (item.hpBonus || 30));
+                showToast(`${player.armor} 장착 완료! (방어력 +${item.defBonus})`, 'success');
+                addLog(`🛡️ [장비] 방어구 '${player.armor}'을(를) 장착했습니다.`, 'text-sky-400');
+            }
+            updateInventoryUI();
+            recalculatePlayerStats();
+        };
+
+        // 상점 모달 제어
+        document.getElementById('btn-open-shop').addEventListener('click', () => {
+            if (player.totalKills < 5) {
+                showToast(`상점을 열려면 몬스터를 5마리 이상 처치해야 합니다! (현재 ${player.totalKills}/5)`, 'warning');
+                return;
+            }
+            renderShopBuyList();
+            renderShopSellList();
+            document.getElementById('shop-gold').innerText = `${player.gold} G`;
+            document.getElementById('shop-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('btn-close-shop').addEventListener('click', () => {
+            document.getElementById('shop-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-close-shop-footer').addEventListener('click', () => {
+            document.getElementById('shop-modal').classList.add('hidden');
+        });
+
+        const tabBuy = document.getElementById('shop-tab-buy');
+        const tabSell = document.getElementById('shop-tab-sell');
+        const buyContainer = document.getElementById('shop-buy-container');
+        const sellContainer = document.getElementById('shop-sell-container');
+
+        tabBuy.addEventListener('click', () => {
+            tabBuy.className = "flex-1 pb-2 text-xs font-bold text-amber-400 border-b-2 border-amber-400 transition-all";
+            tabSell.className = "flex-1 pb-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all";
+            buyContainer.classList.remove('hidden');
+            sellContainer.classList.add('hidden');
+        });
+
+        tabSell.addEventListener('click', () => {
+            tabSell.className = "flex-1 pb-2 text-xs font-bold text-amber-400 border-b-2 border-amber-400 transition-all";
+            tabBuy.className = "flex-1 pb-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all";
+            sellContainer.classList.remove('hidden');
+            buyContainer.classList.add('hidden');
+            renderShopSellList();
+        });
+
+        function renderShopBuyList() {
+            const list = document.getElementById('shop-items-list');
+            list.innerHTML = '';
+            shopInventory.forEach((item, index) => {
+                const tierName = item.tier || '일반';
+                const badgeStyle = tierColors[tierName] || tierColors['일반'];
+                const row = document.createElement('div');
+                row.className = `p-2.5 rounded-xl border flex items-center justify-between text-xs ${badgeStyle}`;
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${item.icon}</span>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold">${item.name}</span>
+                                <span class="text-[9px] px-1 rounded border border-current opacity-80">${tierName}</span>
+                            </div>
+                            <span class="block text-[10px] text-slate-300">${item.desc}</span>
+                            <span class="text-amber-400 font-mono text-[10px] font-bold">${item.price} G</span>
+                        </div>
+                    </div>
+                    <button class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all" onclick="buyShopItem(${index})">구매</button>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function renderShopSellList() {
+            const list = document.getElementById('shop-sell-list');
+            if (!player.inventory || player.inventory.length === 0) {
+                list.innerHTML = `<div class="text-xs text-slate-500 text-center py-4">판매할 아이템이 없습니다.</div>`;
+                return;
+            }
+            list.innerHTML = '';
+            player.inventory.forEach((item, index) => {
+                const sellPrice = item.sellPrice || 15;
+                const tierName = item.tier || '일반';
+                const badgeStyle = tierColors[tierName] || tierColors['일반'];
+                const row = document.createElement('div');
+                row.className = `p-2.5 rounded-xl border flex items-center justify-between text-xs ${badgeStyle}`;
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${item.icon}</span>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold">${item.name}</span>
+                                <span class="text-[9px] px-1 rounded border border-current opacity-80">${tierName}</span>
+                            </div>
+                            <span class="block text-[10px] text-slate-300">판매가: <span class="text-amber-400 font-bold">${sellPrice} G</span></span>
+                        </div>
+                    </div>
+                    <button class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all" onclick="sellInventoryItem(${index})">판매</button>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        window.buyShopItem = function(index) {
+            const item = shopInventory[index];
+            if (player.gold < item.price) {
+                showToast('골드가 부족합니다!', 'error');
+                return;
+            }
+            player.gold -= item.price;
+            player.inventory.push({ ...item });
+            showToast(`${item.name} 구매 완료!`, 'success');
+            addLog(`🛒 [상점] ${item.name}을(를) ${item.price}G에 구매했습니다.`, 'text-amber-400');
+            document.getElementById('shop-gold').innerText = `${player.gold} G`;
+            updateInventoryUI();
+            recalculatePlayerStats();
+            renderShopSellList();
+        };
+
+        window.sellInventoryItem = function(index) {
+            const item = player.inventory[index];
+            const sellPrice = item.sellPrice || 15;
+            player.gold += sellPrice;
+            player.inventory.splice(index, 1);
+            showToast(`${item.name} 판매 완료 (+${sellPrice}G)`, 'success');
+            addLog(`💰 [상점] ${item.name}을(를) 판매하여 ${sellPrice}G를 얻었습니다.`, 'text-amber-400');
+            document.getElementById('shop-gold').innerText = `${player.gold} G`;
+            updateInventoryUI();
+            recalculatePlayerStats();
+            renderShopSellList();
+        };
+
+        // 대장간 모달 제어
+        document.getElementById('btn-open-blacksmith').addEventListener('click', () => {
+            if (player.totalKills < 3) {
+                showToast(`대장간을 열려면 몬스터를 3마리 이상 처치해야 합니다! (현재 ${player.totalKills}/3)`, 'warning');
+                return;
+            }
+            renderBlacksmithUI();
+            document.getElementById('blacksmith-modal').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-blacksmith').addEventListener('click', () => {
+            document.getElementById('blacksmith-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-close-bs-footer').addEventListener('click', () => {
+            document.getElementById('blacksmith-modal').classList.add('hidden');
+        });
+
+        function renderBlacksmithUI() {
+            document.getElementById('bs-gold').innerText = `${player.gold} G`;
+            document.getElementById('bs-kills').innerText = `${player.totalKills}킬`;
+
+            const matList = document.getElementById('bs-materials-list');
+            matList.innerHTML = '';
+            for (let m in player.materials) {
+                const count = player.materials[m];
+                const badge = document.createElement('div');
+                badge.className = 'bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 text-slate-300';
+                badge.innerHTML = `${m}: <span class="text-purple-400 font-bold">${count}개</span>`;
+                matList.appendChild(badge);
+            }
+
+            const eqList = document.getElementById('bs-equipment-list');
+            eqList.innerHTML = `
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700 flex items-center justify-between text-xs">
+                    <div>
+                        <div class="font-bold text-amber-400">장착 무기: ${player.weapon} (+${player.weaponEnhance})</div>
+                        <div class="text-[10px] text-slate-400">강화 비용: 골드 50G + 슬라임 젤리 2개</div>
+                    </div>
+                    <button class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px]" onclick="upgradeWeapon()">무기 강화</button>
+                </div>
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700 flex items-center justify-between text-xs">
+                    <div>
+                        <div class="font-bold text-sky-400">장착 갑옷: ${player.armor} (+${player.armorEnhance})</div>
+                        <div class="text-[10px] text-slate-400">강화 비용: 골드 40G + 고블린 투구조각 2개</div>
+                    </div>
+                    <button class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px]" onclick="upgradeArmor()">갑옷 강화</button>
+                </div>
+            `;
+        }
+
+        window.upgradeWeapon = function() {
+            const costGold = 50 + (player.weaponEnhance * 20);
+            const costMat = 2;
+            if (player.gold < costGold) {
+                showToast('강화 골드가 부족합니다!', 'error');
+                return;
+            }
+            if (player.materials['슬라임 젤리'] < costMat) {
+                showToast('슬라임 젤리가 부족합니다!', 'error');
+                return;
+            }
+            player.gold -= costGold;
+            player.materials['슬라임 젤리'] -= costMat;
+            player.weaponEnhance += 1;
+            showToast(`무기가 +${player.weaponEnhance}(으)로 강화되었습니다!`, 'success');
+            addLog(`⚒️ [대장간] 무기를 성공적으로 강화했습니다! (+${player.weaponEnhance})`, 'text-purple-400');
+            renderBlacksmithUI();
+            recalculatePlayerStats();
+        };
+
+        window.upgradeArmor = function() {
+            const costGold = 40 + (player.armorEnhance * 20);
+            const costMat = 2;
+            if (player.gold < costGold) {
+                showToast('강화 골드가 부족합니다!', 'error');
+                return;
+            }
+            if (player.materials['고블린 투구조각'] < costMat) {
+                showToast('고블린 투구조각이 부족합니다!', 'error');
+                return;
+            }
+            player.gold -= costGold;
+            player.materials['고블린 투구조각'] -= costMat;
+            player.armorEnhance += 1;
+            showToast(`갑옷이 +${player.armorEnhance}(으)로 강화되었습니다!`, 'success');
+            addLog(`⚒️ [대장간] 갑옷을 성공적으로 강화했습니다! (+${player.armorEnhance})`, 'text-purple-400');
+            renderBlacksmithUI();
+            recalculatePlayerStats();
+        };
+
+        // 전투 스폰
+        function spawnMonster() {
+            // 레벨에 따라 몬스터 종류 확장
+            let availableMonsters = [monsters[0]];
+            if (player.level >= 2) availableMonsters.push(monsters[1]);
+            if (player.level >= 4) availableMonsters.push(monsters[2]);
+            if (player.level >= 6) availableMonsters.push(monsters[3]);
+
+            const template = availableMonsters[Math.floor(Math.random() * availableMonsters.length)];
+            currentMonster = {
+                name: template.name,
+                maxHp: template.hp + (player.level - 1) * 10,
+                hp: template.hp + (player.level - 1) * 10,
+                atk: template.atk + (player.level - 1) * 3,
+                exp: template.exp,
+                gold: template.gold,
+                dropMaterial: template.dropMaterial,
+                imgPath: template.imgPath,
+                emoji: template.emoji
+            };
+
+            document.getElementById('monster-name').innerText = currentMonster.name;
+            document.getElementById('monster-hp-text').innerText = `HP: ${currentMonster.hp} / ${currentMonster.maxHp}`;
+            document.getElementById('monster-hp-bar').style.width = '100%';
+
+            const imgContainer = document.getElementById('monster-img-container');
+            if (currentMonster.imgPath) {
+                imgContainer.innerHTML = `
+                    <img id="monster-img" src="${currentMonster.imgPath}" alt="${currentMonster.name}" class="w-24 h-24 object-contain filter drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)] transition-all duration-300" onerror="this.onerror=null; this.parentNode.innerHTML='<span class=\'text-5xl filter drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)]\'>👾</span>';">
+                    <div id="slash-effect-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 z-30 overflow-visible">
+                        <img src="SLASH EFFECT.jpg" alt="Slash" class="w-36 h-36 object-contain filter drop-shadow-[0_0_12px_rgba(239,68,68,0.9)] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" onerror="this.onerror=null; this.innerHTML='<span class=\'text-red-500 text-6xl font-extrabold\'>⚡</span>';">
+                    </div>
+                `;
+            } else {
+                imgContainer.innerHTML = `
+                    <span class="text-6xl filter drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)] transition-all duration-300" id="monster-img">${currentMonster.emoji}</span>
+                    <div id="slash-effect-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 z-30 overflow-visible">
+                        <img src="SLASH EFFECT.jpg" alt="Slash" class="w-36 h-36 object-contain filter drop-shadow-[0_0_12px_rgba(239,68,68,0.9)] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" onerror="this.onerror=null; this.innerHTML='<span class=\'text-red-500 text-6xl font-extrabold\'>⚡</span>';">
+                    </div>
+                `;
+            }
+        }
+
+        // 데미지 플로팅 텍스트 생성
+        function showDamagePopup(text, isCrit = false, targetIsMonster = true) {
+            const container = targetIsMonster ? document.getElementById('monster-area') : document.getElementById('game-screen');
+            const popup = document.createElement('div');
+            popup.className = `damage-popup ${isCrit ? 'text-amber-300 text-xl' : 'text-rose-500'}`;
+            popup.innerText = text;
+            popup.style.left = `${45 + (Math.random() * 10 - 5)}%`;
+            popup.style.top = `${40 + (Math.random() * 10 - 5)}%`;
+            container.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+        }
+
+        // 언더테일 스타일 검기 애니메이션 실행
+        function triggerSlashEffect() {
+            const slashOverlay = document.getElementById('slash-effect-overlay');
+            if (!slashOverlay) return;
+            slashOverlay.classList.remove('animate-slash');
+            void slashOverlay.offsetWidth; // trigger reflow
+            slashOverlay.classList.add('animate-slash');
+        }
+
+        // 기본 공격
+        document.getElementById('btn-attack').addEventListener('click', () => {
+            if (!isPlayerTurn || !currentMonster || isProcessing) return;
+            executePlayerAttack(false);
+        });
+
+        // 강타 스킬
+        document.getElementById('btn-skill').addEventListener('click', () => {
+            if (!isPlayerTurn || !currentMonster || skillChargeCount < 5 || isProcessing) return;
+            skillChargeCount = 0;
+            updateSkillButtonState();
+            executePlayerAttack(true);
+        });
+
+        // 물약 사용
+        document.getElementById('btn-heal').addEventListener('click', () => {
+            if (!isPlayerTurn || !currentMonster || isProcessing) return;
+            isProcessing = true;
+            const healAmount = 45;
+            player.hp = Math.min(player.maxHp, player.hp + healAmount);
+            addLog(`🧪 [포션] 즉시 체력을 ${healAmount} 회복했습니다!`, 'text-emerald-400');
+            recalculatePlayerStats();
+            isPlayerTurn = false;
+            const indicator = document.getElementById('turn-indicator');
+            if (indicator) indicator.innerText = '적의 턴';
+            setTimeout(() => {
+                isProcessing = false;
+                monsterTurn();
+            }, 600);
+        });
+
+        function updateSkillButtonState() {
+            const btn = document.getElementById('btn-skill');
+            const badge = document.getElementById('skill-charge-badge');
+            badge.innerText = `${skillChargeCount}/5`;
+            if (skillChargeCount >= 5) {
+                btn.removeAttribute('disabled');
+                btn.className = "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3.5 px-3 rounded-xl shadow-lg shadow-amber-600/20 transition-all duration-200 active:scale-95 text-xs sm:text-sm flex flex-col items-center justify-center gap-1 relative";
+            } else {
+                btn.setAttribute('disabled', 'true');
+                btn.className = "bg-gradient-to-r from-amber-600/40 to-orange-600/40 text-slate-400 font-bold py-3.5 px-3 rounded-xl shadow-lg transition-all duration-200 text-xs sm:text-sm flex flex-col items-center justify-center gap-1 cursor-not-allowed border border-amber-500/20 relative";
+            }
+        }
+
+        function executePlayerAttack(isSkill = false) {
+            isProcessing = true;
+            isPlayerTurn = false;
+            const indicator = document.getElementById('turn-indicator');
+            if (indicator) indicator.innerText = '전투 중...';
+
+            let dmg = player.atk + Math.floor(Math.random() * 5);
+            let critChance = 0.2 + ((player.bonusCrit || 0) / 100);
+            let isCrit = Math.random() < critChance;
+            if (isSkill) {
+                dmg = Math.floor(dmg * 1.8);
+                isCrit = true;
+                addLog(`🔥 [스킬] 강력한 강타 스킬 작렬!`, 'text-amber-300 font-bold');
+            }
+            if (isCrit) dmg = Math.floor(dmg * 1.5);
+
+            currentMonster.hp = Math.max(0, currentMonster.hp - dmg);
+            
+            // UI 안전 반영
+            const hpText = document.getElementById('monster-hp-text');
+            if (hpText) hpText.innerText = `HP: ${currentMonster.hp} / ${currentMonster.maxHp}`;
+            
+            const hpBar = document.getElementById('monster-hp-bar');
+            if (hpBar) hpBar.style.width = `${Math.max(0, (currentMonster.hp / currentMonster.maxHp) * 100)}%`;
+            
+            showDamagePopup(`-${dmg}${isCrit ? ' CRIT!' : ''}`, isCrit, true);
+            triggerSlashEffect();
+
+            addLog(`⚔️ [전투] ${currentMonster.name}에게 ${dmg}의 대미지를 입혔습니다!`, isCrit ? 'text-amber-300 font-bold' : 'text-slate-200');
+
+            if (!isSkill) {
+                skillChargeCount = Math.min(5, skillChargeCount + 1);
+                updateSkillButtonState();
+            }
+
+            if (currentMonster.hp <= 0) {
+                setTimeout(() => {
+                    isProcessing = false;
+                    handleMonsterDeath();
+                }, 400);
+            } else {
+                setTimeout(() => {
+                    isProcessing = false;
+                    monsterTurn();
+                }, 600);
+            }
+        }
+
+        function monsterTurn() {
+            if (!currentMonster || currentMonster.hp <= 0) return;
+
+            // 적 돌진 애니메이션 안전 처리
+            const imgEl = document.getElementById('monster-img');
+            if (imgEl) {
+                imgEl.classList.add('animate-dash');
+                setTimeout(() => {
+                    if (imgEl) imgEl.classList.remove('animate-dash');
+                }, 400);
+            }
+
+            let rawDmg = currentMonster.atk + Math.floor(Math.random() * 4);
+            let netDmg = Math.max(1, rawDmg - Math.floor(player.def * 0.6));
+            player.hp = Math.max(0, player.hp - netDmg);
+
+            // 피격 화면 흔들림 & 플래시
+            document.body.classList.add('animate-screen-shake');
+            setTimeout(() => document.body.classList.remove('animate-screen-shake'), 300);
+            showDamagePopup(`-${netDmg}`, false, false);
+
+            addLog(`💥 [피격] ${currentMonster.name}의 반격! ${netDmg}의 대미지를 입었습니다.`, 'text-rose-400 font-bold');
+            recalculatePlayerStats();
+
+            if (player.hp <= 0) {
+                addLog(`💀 [게임오버] 체력이 다하여 쓰러졌습니다. 체력을 전복합니다!`, 'text-rose-500 font-bold');
+                showToast('전투에서 패배하여 체력이 회복됩니다.', 'error');
+                player.hp = player.maxHp;
+            }
+
+            isPlayerTurn = true;
+            const indicator = document.getElementById('turn-indicator');
+            if (indicator) indicator.innerText = '내 턴';
+        }
+
+        function handleMonsterDeath() {
+            addLog(`🎉 [승리] ${currentMonster.name}을(를) 처치했습니다! EXP +${currentMonster.exp}, Gold +${currentMonster.gold}`, 'text-emerald-400 font-bold');
+            showToast(`${currentMonster.name} 처치 성공!`, 'success');
+
+            player.gold += currentMonster.gold;
+            player.exp += currentMonster.exp;
+            player.totalKills += 1;
+            player.weaponKills[player.weapon] = (player.weaponKills[player.weapon] || 0) + 1;
+
+            // 상점 리셋 카운터 증가 및 5마리마다 리셋
+            shopResetKillCounter += 1;
+            if (shopResetKillCounter >= 5) {
+                shopResetKillCounter = 0;
+                refreshShopInventory();
+                addLog(`🛒 [상점] 모험가의 활약으로 방랑 상점의 물품이 새롭게 입고되었습니다!`, 'text-amber-300 font-bold');
+                showToast('방랑 상점의 물품이 리셋되었습니다!', 'success');
+            }
+
+            // 재료 드랍 처리
+            if (currentMonster.dropMaterial && player.materials[currentMonster.dropMaterial] !== undefined) {
+                player.materials[currentMonster.dropMaterial] += 1;
+                addLog(`🧪 [재료] '${currentMonster.dropMaterial}' 1개를 획득했습니다!`, 'text-purple-400 font-bold');
+            }
+
+            // 장비 드랍 확률 (레벨 보정 포함 및 현재 장착 무기 타입 기준 필터링)
+            if (Math.random() < 0.65) {
+                const levelBonus = Math.min(15, (player.level - 1) * 1.5);
+                
+                // 현재 장착 중인 무기 타입과 동일하거나, 방어구/포션인 아이템만 필터링
+                const filteredDropPool = dropItemPool.filter(item => {
+                    if (item.type === 'weapon') {
+                        return item.weaponType === player.weapon;
+                    }
+                    return true; // 갑옷 및 포션은 항상 드랍 풀에 포함
+                });
+
+                // 만약 필터링된 풀이 비어있다면 전체 풀 사용
+                const activePool = filteredDropPool.length > 0 ? filteredDropPool : dropItemPool;
+
+                const weightedPool = activePool.map(item => {
+                    let weight = 1;
+                    const t = item.tier || '일반';
+                    if (t === '일반') weight = Math.max(10, 50 - levelBonus * 2);
+                    else if (t === '희귀') weight = 25 + levelBonus;
+                    else if (t === '에픽') weight = 10 + levelBonus * 0.8;
+                    else if (t === '전설') weight = 3 + levelBonus * 0.4;
+                    else if (t === '신화') weight = 1 + levelBonus * 0.2;
+                    return { item, weight };
+                });
+
+                let totalWeight = weightedPool.reduce((sum, wp) => sum + wp.weight, 0);
+                let randomVal = Math.random() * totalWeight;
+                let currentSum = 0;
+                let selectedDrop = activePool[0];
+
+                for (let wp of weightedPool) {
+                    currentSum += wp.weight;
+                    if (randomVal <= currentSum) {
+                        selectedDrop = wp.item;
+                        break;
+                    }
+                }
+
+                player.inventory.push({ ...selectedDrop });
+                const tierTag = `[${selectedDrop.tier || '일반'}]`;
+                addLog(`🎁 [드랍] ${tierTag} ${selectedDrop.icon} ${selectedDrop.name} 획득!`, 'text-amber-400 font-bold');
+                showToast(`${selectedDrop.name} (${selectedDrop.tier || '일반'}) 획득!`, 'success');
+                updateInventoryUI();
+            }
+
+            // 레벨업 체크
+            if (player.exp >= player.maxExp) {
+                player.level += 1;
+                player.exp = 0;
+                player.maxExp = Math.floor(player.maxExp * 1.4);
+                player.maxHp += 25;
+                player.hp = player.maxHp;
+                player.statPoints = (player.statPoints || 0) + 5; // 레벨당 5 SP 지급
+                addLog(`⭐ [레벨업] 축하합니다! 레벨이 ${player.level}이 되었습니다! 스탯 포인트(SP) 5가 지급되었습니다.`, 'text-amber-300 font-bold');
+                showToast(`레벨 업! Lv. ${player.level} 달성 (SP +5)!`, 'success');
+            }
+
+            recalculatePlayerStats();
+            
+            // 다음 몬스터 스폰 및 턴 권한 확실히 복구
+            setTimeout(() => {
+                spawnMonster();
+                isPlayerTurn = true;
+                isProcessing = false;
+                const indicator = document.getElementById('turn-indicator');
+                if (indicator) indicator.innerText = '내 턴';
+            }, 800);
+        }
+
+        // 상점 물품 동적 리셋 함수
+        function refreshShopInventory() {
+            // 상점 아이템 풀을 기반으로 무작위 4~6개의 상품을 새로 구성
+            const pool = [...shopInventory];
+            // 예시로 기존 배열 무작위 섞기 혹은 새로운 강력한 아이템 조합 추가 가능
+            shopInventory.sort(() => Math.random() - 0.5);
+        }
+
+        // 로그인 / 회원가입 연동
+        document.getElementById('btn-login').addEventListener('click', () => handleAuth('login'));
+        document.getElementById('btn-create').addEventListener('click', () => handleAuth('create'));
+
+        async function handleAuth(mode) {
+            const id = document.getElementById('login-id').value.trim();
+            const pw = document.getElementById('login-pw').value.trim();
+            const nickname = document.getElementById('login-nickname').value.trim() || '용사';
+            const selectedWeapon = document.querySelector('input[name="init-weapon"]:checked').value;
+
+            if (!id || !pw) {
+                showToast('아이디와 비밀번호를 모두 입력해주세요.', 'error');
+                return;
+            }
+
+            player.id = id;
+            player.pw = pw;
+            player.nickname = nickname;
+            player.weapon = selectedWeapon;
+
+            const spinner = document.getElementById(`${mode}-spinner`);
+            spinner.classList.remove('hidden');
+
+            if (mode === 'login') {
+                try {
+                    const response = await fetch(`${WEB_APP_URL}?id=${encodeURIComponent(id)}&pw=${encodeURIComponent(pw)}`);
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        const saved = JSON.parse(result.data);
+                        player = { ...player, ...saved };
+                        showToast('성공적으로 데이터를 불러왔습니다!', 'success');
+                    } else {
+                        showToast(result.message || '저장된 계정을 찾을 수 없습니다. 새로 생성해주세요.', 'warning');
+                        spinner.classList.add('hidden');
+                        return;
+                    }
+                } catch (e) {
+                    console.error(e);
+                    showToast('클라우드 연동 URL을 확인해주세요. 기본 설정으로 시작합니다.', 'warning');
+                }
+            } else {
+                // 계정 생성 시 첫 저장 전송
+                await sendDataToGoogleForm(true);
+                showToast('계정이 성공적으로 생성되었습니다!', 'success');
+            }
+
+            spinner.classList.add('hidden');
+            screens.login.classList.add('hidden');
+            screens.game.classList.remove('hidden');
+
+            recalculatePlayerStats();
+            updateInventoryUI();
+            spawnMonster();
+            addLog(`🚀 [시스템] ${player.nickname} 님의 모험이 시작되었습니다!`, 'text-sky-400 font-bold');
+        }
+
+        // 구글 폼 클라우드 저장
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            const saveText = document.getElementById('save-text');
+            saveText.innerText = '저장 중...';
+            await sendDataToGoogleForm(false);
+            saveText.innerText = '클라우드 저장하기';
+            showToast('성공적으로 클라우드에 저장되었습니다!', 'success');
+        });
+
+        async function sendDataToGoogleForm(isNew = false) {
+            const saveData = JSON.stringify({
+                level: player.level,
+                hp: player.hp,
+                maxHp: player.maxHp,
+                exp: player.exp,
+                maxExp: player.maxExp,
+                gold: player.gold,
+                weapon: player.weapon,
+                weaponTier: player.weaponTier,
+                weaponEnhance: player.weaponEnhance,
+                armor: player.armor,
+                armorTier: player.armorTier,
+                armorDef: player.armorDef,
+                armorEnhance: player.armorEnhance,
+                statPoints: player.statPoints,
+                bonusAtk: player.bonusAtk,
+                bonusCrit: player.bonusCrit,
+                bonusHp: player.bonusHp,
+                weaponKills: player.weaponKills,
+                totalKills: player.totalKills,
+                inventory: player.inventory,
+                materials: player.materials
+            });
+
+            const formData = new FormData();
+            formData.append(ENTRY_ID, player.id);
+            formData.append(ENTRY_PW, player.pw);
+            formData.append(ENTRY_NICKNAME, player.nickname);
+            formData.append(ENTRY_DATA, saveData);
+
+            try {
+                await fetch(FORM_ACTION_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: formData
+                });
+                if (!isNew) {
+                    addLog(`💾 [클라우드] 최신 상태가 구글 시트에 안전하게 저장되었습니다.`, 'text-purple-400');
+                }
+            } catch (e) {
+                console.error('Save error:', e);
+            }
+        }
+    </script>
+</body>
+</html>
