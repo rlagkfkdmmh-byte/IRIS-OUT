@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Form RPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-image: url('rpg.jpg'); /* 같은 폴더의 이미지 로드 */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            image-rendering: pixelated; /* 픽셀 아트 배경이 선명하게 보이도록 설정 */
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', 'Noto Sans KR', cursive;
+        }
+        
+        /* 레트로 UI 박스 스타일 */
+        .retro-box {
+            background-color: rgba(30, 64, 175, 0.9); /* 짙은 클래식 블루 */
+            border: 4px solid white;
+            box-shadow: 8px 8px 0px 0px rgba(0,0,0,0.6);
+        }
+        .retro-input {
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #000;
+            border: 4px solid #94a3b8;
+        }
+        .retro-input:focus {
+            border-color: #eab308;
+            outline: none;
+        }
+        
+        /* Custom Scrollbar for logs */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2d3748; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #718096; }
+        
+        .toast-enter { animation: fade-in-up 0.3s ease-out forwards; }
+        .toast-leave { animation: fade-out-down 0.3s ease-in forwards; }
+        
+        @keyframes fade-in-up {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fade-out-down {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(20px); }
+        }
+        @keyframes attack-shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        .animate-attack { animation: attack-shake 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- 1. Login Screen -->
+    <div id="login-screen" class="retro-box p-8 w-full max-w-md">
+        <h1 class="text-4xl mb-6 text-center text-yellow-400 pixel-font drop-shadow-[4px_4px_0_rgba(0,0,0,0.8)]">GOOGLE RPG</h1>
+        <p class="text-white font-bold mb-6 text-center drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">아이디가 없다면 새로 생성하여 시작합니다.</p>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-bold text-white mb-1 drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">아이디 (ID)</label>
+                <input type="text" id="login-id" class="retro-input w-full px-4 py-2 pixel-font text-sm transition-all placeholder-gray-500" placeholder="ID 입력">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-white mb-1 drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">비밀번호 (PASSWORD)</label>
+                <input type="password" id="login-pw" class="retro-input w-full px-4 py-2 pixel-font text-sm transition-all placeholder-gray-500" placeholder="PW 입력">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mt-6">
+                <button id="btn-login" class="w-full bg-yellow-400 hover:bg-yellow-300 text-black border-b-4 border-r-4 border-yellow-700 active:border-0 active:translate-y-1 font-bold py-3 px-2 pixel-font text-xs flex justify-center items-center">
+                    <span id="login-text">로그인</span>
+                    <svg id="login-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-black hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+                <button id="btn-create" class="w-full bg-gray-200 hover:bg-white text-black border-b-4 border-r-4 border-gray-500 active:border-0 active:translate-y-1 font-bold py-3 px-2 pixel-font text-xs flex justify-center items-center">
+                    <span id="create-text">계정생성</span>
+                    <svg id="create-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-black hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Game Screen -->
+    <div id="game-screen" class="hidden retro-box w-full max-w-4xl flex flex-col md:flex-row">
+        
+        <!-- Left Panel: Stats -->
+        <div class="w-full md:w-1/3 bg-transparent p-6 border-b md:border-b-0 md:border-r-4 border-white">
+            <h2 class="text-xl font-bold text-yellow-300 mb-4 pixel-font text-sm drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">STATUS</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center bg-black/40 border-2 border-white/30 p-2">
+                    <span class="text-gray-200 font-bold">ID</span>
+                    <span id="stat-id" class="font-bold text-white pixel-font text-xs">Player</span>
+                </div>
+                <div class="flex justify-between items-center bg-black/40 border-2 border-white/30 p-2">
+                    <span class="text-gray-200 font-bold">Lv.</span>
+                    <span id="stat-level" class="font-bold text-yellow-400 pixel-font text-xs">1</span>
+                </div>
+                <div class="bg-black/40 border-2 border-white/30 p-2">
+                    <div class="flex justify-between text-sm mb-1 font-bold">
+                        <span class="text-red-400">HP</span>
+                        <span id="stat-hp-text" class="text-white pixel-font text-[10px]">100/100</span>
+                    </div>
+                    <div class="w-full bg-black border border-gray-600 h-3">
+                        <div id="stat-hp-bar" class="bg-red-500 h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="bg-black/40 border-2 border-white/30 p-2">
+                    <div class="flex justify-between text-sm mb-1 font-bold">
+                        <span class="text-green-400">EXP</span>
+                        <span id="stat-exp-text" class="text-white pixel-font text-[10px]">0/20</span>
+                    </div>
+                    <div class="w-full bg-black border border-gray-600 h-3">
+                        <div id="stat-exp-bar" class="bg-green-500 h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center bg-black/40 border-2 border-white/30 p-2">
+                    <span class="text-gray-200 font-bold">Gold</span>
+                    <span id="stat-gold" class="font-bold text-yellow-500 pixel-font text-xs">0 G</span>
+                </div>
+                <div class="flex justify-between items-center bg-black/40 border-2 border-white/30 p-2">
+                    <span class="text-gray-200 font-bold">ATK</span>
+                    <span id="stat-atk" class="font-bold text-white pixel-font text-xs">10</span>
+                </div>
+            </div>
+            
+            <button id="btn-save" class="w-full mt-6 bg-purple-600 hover:bg-purple-500 text-white border-b-4 border-r-4 border-purple-900 active:border-0 active:translate-y-1 font-bold py-3 px-4 flex justify-center items-center gap-2 pixel-font text-xs">
+                <span id="save-text">게임 저장</span>
+            </button>
+        </div>
+
+        <!-- Right Panel: Actions & Log -->
+        <div class="w-full md:w-2/3 p-6 flex flex-col bg-transparent">
+            
+            <!-- Monster Display -->
+            <div id="monster-area" class="bg-sky-800/60 border-4 border-white/50 p-6 mb-6 flex flex-col items-center justify-center min-h-[160px] shadow-inner">
+                <h3 id="monster-name" class="text-xl font-bold text-yellow-300 mb-2 pixel-font drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">슬라임</h3>
+                <div class="w-1/2 bg-black border border-gray-700 h-3 mb-1">
+                    <div id="monster-hp-bar" class="bg-red-500 h-full transition-all duration-100" style="width: 100%"></div>
+                </div>
+                <span id="monster-hp-text" class="text-[10px] text-white mb-4 pixel-font drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">HP: 20 / 20</span>
+                <span class="text-6xl drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]" id="monster-img">👾</span>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <button id="btn-attack" class="bg-red-500 hover:bg-red-400 text-white border-b-4 border-r-4 border-red-800 active:border-0 active:translate-y-1 font-bold py-4 px-2 pixel-font text-[10px] sm:text-xs">
+                    공격 (ATTACK)
+                </button>
+                <button id="btn-heal" class="bg-green-500 hover:bg-green-400 text-white border-b-4 border-r-4 border-green-800 active:border-0 active:translate-y-1 font-bold py-4 px-2 pixel-font text-[10px] sm:text-xs">
+                    휴식 (HEAL)
+                </button>
+            </div>
+
+            <!-- Game Log -->
+            <div class="flex-1 bg-black/80 border-4 border-gray-500 p-4 font-mono text-sm overflow-y-auto max-h-48" id="log-container">
+                <div class="text-yellow-300">시스템: 모험을 시작합니다...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Game Screen -->
+    <div id="game-screen" class="hidden bg-gray-900/90 backdrop-blur-md rounded-xl shadow-2xl w-full max-w-4xl border border-gray-700 overflow-hidden flex flex-col md:flex-row">
+        
+        <!-- Left Panel: Stats -->
+        <div class="w-full md:w-1/3 bg-gray-900/50 p-6 border-r border-gray-700">
+            <h2 class="text-xl font-bold text-blue-400 mb-4 pixel-font text-xs">STATUS</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center bg-gray-800 p-3 rounded">
+                    <span class="text-gray-400">ID</span>
+                    <span id="stat-id" class="font-bold text-white">Player</span>
+                </div>
+                <div class="flex justify-between items-center bg-gray-800 p-3 rounded">
+                    <span class="text-gray-400">Level</span>
+                    <span id="stat-level" class="font-bold text-yellow-400">1</span>
+                </div>
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-red-400">HP</span>
+                        <span id="stat-hp-text" class="text-white">100 / 100</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div id="stat-hp-bar" class="bg-red-500 h-2.5 rounded-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-green-400">EXP</span>
+                        <span id="stat-exp-text" class="text-white">0 / 20</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div id="stat-exp-bar" class="bg-green-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center bg-gray-800 p-3 rounded">
+                    <span class="text-gray-400">Gold</span>
+                    <span id="stat-gold" class="font-bold text-yellow-500">0 G</span>
+                </div>
+                <div class="flex justify-between items-center bg-gray-800 p-3 rounded">
+                    <span class="text-gray-400">Attack</span>
+                    <span id="stat-atk" class="font-bold text-white">10</span>
+                </div>
+            </div>
+            
+            <button id="btn-save" class="w-full mt-6 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded transition-colors flex justify-center items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                <span id="save-text">구글 폼에 데이터 저장</span>
+            </button>
+        </div>
+
+        <!-- Right Panel: Actions & Log -->
+        <div class="w-full md:w-2/3 p-6 flex flex-col">
+            
+            <!-- Monster Display -->
+            <div id="monster-area" class="bg-gray-900 rounded-lg p-6 mb-6 flex flex-col items-center justify-center border border-gray-700 min-h-[150px]">
+                <h3 id="monster-name" class="text-xl font-bold text-red-400 mb-2">슬라임</h3>
+                <div class="w-1/2 bg-gray-700 rounded-full h-2 mb-1">
+                    <div id="monster-hp-bar" class="bg-red-500 h-2 rounded-full transition-all duration-100" style="width: 100%"></div>
+                </div>
+                <span id="monster-hp-text" class="text-xs text-gray-400 mb-4">HP: 20 / 20</span>
+                <span class="text-4xl" id="monster-img">👾</span>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <button id="btn-attack" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-4 rounded shadow-lg transition-transform active:scale-95">
+                    공격하기 (Attack)
+                </button>
+                <button id="btn-heal" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-4 rounded shadow-lg transition-transform active:scale-95">
+                    휴식하기 (Heal)
+                </button>
+            </div>
+
+            <!-- Game Log -->
+            <div class="flex-1 bg-black rounded-lg p-4 font-mono text-sm overflow-y-auto border border-gray-700 max-h-48" id="log-container">
+                <div class="text-gray-500">시스템: 모험을 시작합니다...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // [설정 영역] 이 부분의 URL과 ENTRY를 수정하세요!
+        // ==========================================
+        
+        // 1. 앱스 스크립트에서 배포 후 받은 웹 앱 URL (불러오기 용도)
+        const WEB_APP_URL = "여기에_앱스_스크립트_URL을_넣으세요"; 
+        
+        // 2. 구글 폼 POST URL (마지막이 /formResponse 로 끝남)
+        const FORM_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLScSwZ4uA1MiKtSkaHWLlseW40xUKcndC77pHd8T5LP3JllmKA/formResponse";
+        
+        // 3. 구글 폼 항목 고유 ID (크롬 개발자 도구로 폼 미리보기에서 input의 name 속성인 entry.XXXXXX 를 찾아야 함)
+        const ENTRY_ID = "entry.111111111"; // 아이디 문항의 entry id
+        const ENTRY_PW = "entry.222222222"; // 비밀번호 문항의 entry id
+        const ENTRY_DATA = "entry.333333333"; // 세이브데이터 문항의 entry id
+
+        // ==========================================
+
+        // DOM Elements
+        const screens = {
+            login: document.getElementById('login-screen'),
+            game: document.getElementById('game-screen')
+        };
+        const logs = document.getElementById('log-container');
+        
+        // Game State
+        let player = {
+            id: '',
+            pw: '',
+            level: 1,
+            hp: 100,
+            maxHp: 100,
+            exp: 0,
+            maxExp: 20,
+            gold: 0,
+            atk: 10
+        };
+
+        let currentMonster = null;
+
+        // Monsters DB
+        const monsters = [
+            { name: '슬라임', hp: 20, atk: 2, exp: 5, gold: 10, img: '👾' },
+            { name: '고블린', hp: 50, atk: 5, exp: 12, gold: 25, img: '👺' },
+            { name: '오크', hp: 120, atk: 12, exp: 30, gold: 50, img: '👹' },
+            { name: '드래곤', hp: 500, atk: 35, exp: 100, gold: 300, img: '🐉' }
+        ];
+
+        // --- Custom Toast Notification ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+            
+            toast.className = `${colors[type]} text-white px-6 py-3 rounded shadow-lg text-sm font-bold toast-enter`;
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-leave');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- Logger ---
+        function addLog(msg, color = 'text-gray-300') {
+            const div = document.createElement('div');
+            div.className = `mb-1 ${color}`;
+            div.innerText = `> ${msg}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // --- UI Updates ---
+        function updateUI() {
+            document.getElementById('stat-id').innerText = player.id;
+            document.getElementById('stat-level').innerText = player.level;
+            document.getElementById('stat-hp-text').innerText = `${player.hp} / ${player.maxHp}`;
+            document.getElementById('stat-hp-bar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+            document.getElementById('stat-exp-text').innerText = `${player.exp} / ${player.maxExp}`;
+            document.getElementById('stat-exp-bar').style.width = `${Math.max(0, (player.exp / player.maxExp) * 100)}%`;
+            document.getElementById('stat-gold').innerText = `${player.gold} G`;
+            document.getElementById('stat-atk').innerText = player.atk;
+        }
+
+        function updateMonsterUI() {
+            if (!currentMonster) spawnMonster();
+            
+            document.getElementById('monster-name').innerText = currentMonster.name;
+            document.getElementById('monster-hp-text').innerText = `HP: ${currentMonster.currentHp} / ${currentMonster.maxHp}`;
+            document.getElementById('monster-hp-bar').style.width = `${Math.max(0, (currentMonster.currentHp / currentMonster.maxHp) * 100)}%`;
+            document.getElementById('monster-img').innerText = currentMonster.img;
+        }
+
+        // --- Game Logic ---
+        function spawnMonster() {
+            // Level based random monster
+            let maxIndex = Math.min(monsters.length - 1, Math.floor(player.level / 3));
+            let template = monsters[Math.floor(Math.random() * (maxIndex + 1))];
+            
+            currentMonster = {
+                name: template.name,
+                maxHp: template.hp + (player.level * 2),
+                currentHp: template.hp + (player.level * 2),
+                atk: template.atk + Math.floor(player.level / 2),
+                exp: template.exp,
+                gold: template.gold,
+                img: template.img
+            };
+            
+            addLog(`${currentMonster.name}이(가) 나타났다!`, 'text-yellow-400');
+            updateMonsterUI();
+        }
+
+        function levelUp() {
+            player.level++;
+            player.exp -= player.maxExp;
+            player.maxExp = Math.floor(player.maxExp * 1.5);
+            player.maxHp += 20;
+            player.hp = player.maxHp;
+            player.atk += 3;
+            addLog(`축하합니다! 레벨 ${player.level}(이)가 되었습니다!`, 'text-yellow-300 font-bold');
+            showToast('레벨 업!', 'success');
+        }
+
+        document.getElementById('btn-attack').addEventListener('click', () => {
+            if(player.hp <= 0) {
+                showToast('체력이 부족합니다. 휴식하세요!', 'warning');
+                return;
+            }
+
+            // Player Attack
+            let dmg = Math.floor(Math.random() * (player.atk * 0.2)) + player.atk;
+            currentMonster.currentHp -= dmg;
+            
+            // Animation
+            const mImg = document.getElementById('monster-img');
+            mImg.classList.remove('animate-attack');
+            void mImg.offsetWidth; // trigger reflow
+            mImg.classList.add('animate-attack');
+
+            addLog(`${currentMonster.name}에게 ${dmg}의 피해를 입혔습니다.`, 'text-white');
+
+            // Monster Dies
+            if (currentMonster.currentHp <= 0) {
+                addLog(`${currentMonster.name}을(를) 처치했습니다!`, 'text-green-400');
+                player.exp += currentMonster.exp;
+                player.gold += currentMonster.gold;
+                addLog(`${currentMonster.exp} EXP와 ${currentMonster.gold} 골드를 획득했습니다.`, 'text-green-300');
+                
+                if (player.exp >= player.maxExp) {
+                    levelUp();
+                }
+                
+                spawnMonster();
+            } else {
+                // Monster Counterattack
+                let mDmg = Math.floor(Math.random() * (currentMonster.atk * 0.2)) + currentMonster.atk;
+                player.hp -= mDmg;
+                addLog(`${currentMonster.name}의 반격! ${mDmg}의 피해를 입었습니다.`, 'text-red-400');
+                
+                if (player.hp <= 0) {
+                    player.hp = 0;
+                    addLog('눈앞이 깜깜해졌다... (체력이 0이 되었습니다)', 'text-red-500');
+                    showToast('전투 불능!', 'error');
+                }
+            }
+            
+            updateUI();
+            updateMonsterUI();
+        });
+
+        document.getElementById('btn-heal').addEventListener('click', () => {
+            if(player.hp >= player.maxHp) {
+                showToast('이미 체력이 가득 찼습니다.', 'info');
+                return;
+            }
+            let healAmount = Math.floor(player.maxHp * 0.3);
+            player.hp = Math.min(player.maxHp, player.hp + healAmount);
+            addLog(`휴식을 취해 체력을 ${healAmount}만큼 회복했습니다.`, 'text-blue-300');
+            updateUI();
+        });
+
+
+        // --- Network (Save / Load) ---
+
+        // 로딩 UI 제어 (로그인 & 계정생성 공용)
+        function toggleAuthLoading(type, isLoading) {
+            const btn = document.getElementById(type === 'login' ? 'btn-login' : 'btn-create');
+            const text = document.getElementById(type === 'login' ? 'login-text' : 'create-text');
+            const spinner = document.getElementById(type === 'login' ? 'login-spinner' : 'create-spinner');
+            
+            if (isLoading) {
+                btn.disabled = true;
+                text.classList.add('hidden');
+                spinner.classList.remove('hidden');
+                btn.classList.add('cursor-not-allowed', 'opacity-70');
+            } else {
+                btn.disabled = false;
+                text.classList.remove('hidden');
+                spinner.classList.add('hidden');
+                btn.classList.remove('cursor-not-allowed', 'opacity-70');
+            }
+        }
+
+        function toggleSaveLoading(isLoading) {
+            const btn = document.getElementById('btn-save');
+            const text = document.getElementById('save-text');
+            
+            if (isLoading) {
+                btn.disabled = true;
+                text.innerText = "저장 중...";
+                btn.classList.add('cursor-not-allowed', 'opacity-70');
+            } else {
+                btn.disabled = false;
+                text.innerText = "구글 폼에 데이터 저장";
+                btn.classList.remove('cursor-not-allowed', 'opacity-70');
+            }
+        }
+
+        // --- 로그인 기능 ---
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const idInput = document.getElementById('login-id').value.trim();
+            const pwInput = document.getElementById('login-pw').value.trim();
+
+            if (!idInput || !pwInput) {
+                showToast('아이디와 비밀번호를 모두 입력해주세요.', 'error');
+                return;
+            }
+
+            if (WEB_APP_URL === "여기에_앱스_스크립트_URL을_넣으세요") {
+                showToast('[테스트 모드] 구글 연동 설정이 없어 로컬 데이터로 시작합니다.', 'info');
+                player.id = idInput;
+                player.pw = pwInput;
+                startGame();
+                return;
+            }
+
+            toggleAuthLoading('login', true);
+            try {
+                const response = await fetch(`${WEB_APP_URL}?id=${encodeURIComponent(idInput)}&pw=${encodeURIComponent(pwInput)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const loadData = JSON.parse(result.data);
+                    player = { ...loadData, id: idInput, pw: pwInput };
+                    showToast('세이브 데이터를 성공적으로 불러왔습니다!', 'success');
+                    startGame();
+                } else {
+                    showToast('계정을 찾을 수 없거나 비밀번호가 틀렸습니다.', 'error');
+                }
+            } catch (error) {
+                console.error("Load Error:", error);
+                showToast('서버와 통신하는 데 실패했습니다.', 'error');
+            } finally {
+                toggleAuthLoading('login', false);
+            }
+        });
+
+        // --- 계정 생성 기능 ---
+        document.getElementById('btn-create').addEventListener('click', async () => {
+            const idInput = document.getElementById('login-id').value.trim();
+            const pwInput = document.getElementById('login-pw').value.trim();
+
+            if (!idInput || !pwInput) {
+                showToast('생성할 아이디와 비밀번호를 모두 입력해주세요.', 'error');
+                return;
+            }
+
+            if (WEB_APP_URL === "여기에_앱스_스크립트_URL을_넣으세요") {
+                showToast('[테스트 모드] 테스트용 계정으로 시작합니다.', 'info');
+                player.id = idInput;
+                player.pw = pwInput;
+                startGame();
+                return;
+            }
+
+            toggleAuthLoading('create', true);
+            try {
+                // 아이디 중복 방지를 위한 사전 확인
+                const response = await fetch(`${WEB_APP_URL}?id=${encodeURIComponent(idInput)}&pw=${encodeURIComponent(pwInput)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('이미 존재하는 계정입니다. 로그인을 진행해 주세요.', 'warning');
+                } else {
+                    showToast('계정이 생성되었습니다! 모험을 시작합니다.', 'success');
+                    // 스탯 초기화 후 시작
+                    player = {
+                        id: idInput, pw: pwInput,
+                        level: 1, hp: 100, maxHp: 100, exp: 0, maxExp: 20, gold: 0, atk: 10
+                    };
+                    startGame();
+                    
+                    // 가입과 동시에 엑셀에 첫 데이터 등록을 위해 백그라운드 저장 실행
+                    document.getElementById('btn-save').click();
+                }
+            } catch (error) {
+                console.error("Create Error:", error);
+                showToast('계정 생성 중 오류가 발생했습니다.', 'error');
+            } finally {
+                toggleAuthLoading('create', false);
+            }
+        });
+
+        function startGame() {
+            screens.login.classList.add('hidden');
+            screens.game.classList.remove('hidden');
+            
+            // UI 초기화
+            updateUI();
+            spawnMonster();
+        }
+
+        // 구글 폼으로 세이브 데이터 전송
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            if (FORM_ACTION_URL === "https://docs.google.com/forms/d/e/1FAIpQLScSwZ4uA1MiKtSkaHWLlseW40xUKcndC77pHd8T5LP3JllmKA/formResponse" && ENTRY_ID === "entry.111111111") {
+                showToast('[설정 필요] 코드 상단의 ENTRY ID를 실제 구글 폼 항목 ID로 변경해야 저장됩니다.', 'warning');
+                return;
+            }
+
+            toggleSaveLoading(true);
+
+            // 저장할 데이터에서 민감정보(비번 등) 제외하고 묶기
+            const saveData = {
+                level: player.level,
+                hp: player.hp,
+                maxHp: player.maxHp,
+                exp: player.exp,
+                maxExp: player.maxExp,
+                gold: player.gold,
+                atk: player.atk
+            };
+
+            const formData = new FormData();
+            formData.append(ENTRY_ID, player.id);
+            formData.append(ENTRY_PW, player.pw);
+            formData.append(ENTRY_DATA, JSON.stringify(saveData));
+
+            try {
+                // 구글 폼 제출 (CORS 제한 때문에 mode: 'no-cors' 필수)
+                // no-cors 설정 시 response.ok 검사를 할 수 없으므로 catch에 안걸리면 성공으로 간주
+                await fetch(FORM_ACTION_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: formData
+                });
+                
+                showToast('스프레드시트에 진행 상황이 저장되었습니다!', 'success');
+                addLog('진행 상황이 저장되었습니다.', 'text-purple-400');
+            } catch (error) {
+                console.error("Save Error:", error);
+                showToast('저장에 실패했습니다.', 'error');
+            } finally {
+                toggleSaveLoading(false);
+            }
+        });
+
+    </script>
+</body>
+</html>
